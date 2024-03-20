@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "7944163292",
+    "project_id": "mlmodelwithandroidapp",
+    "storage_bucket": "mlmodelwithandroidapp.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:7944163292:android:e8cd08f43547e4cb0a4919",
+        "android_client_info": {
+          "package_name": "com.abrebo.mlmodelwithandroidapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBsgFTnoaxh8GgBCIKOuDpDF0ZJxRHaarE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
