@@ -2,14 +2,11 @@ package com.abrebo.mlmodelwithandroidapp;
 
 import androidx.appcompat.app.AppCompatActivity;
 import android.app.Activity;
-import android.content.Context;
 import android.content.res.AssetFileDescriptor;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Toast;
 import com.abrebo.mlmodelwithandroidapp.databinding.ActivityMainBinding;
-import com.abrebo.mlmodelwithandroidapp.ml.ConvertedModel;
-
 import org.tensorflow.lite.DataType;
 import org.tensorflow.lite.Interpreter;
 import org.tensorflow.lite.support.tensorbuffer.TensorBuffer;
@@ -20,15 +17,21 @@ import java.nio.channels.FileChannel;
 
 public class MainActivity extends AppCompatActivity {
     private ActivityMainBinding binding;
-    private ConvertedModel model;
-    private Context context;
+    private Interpreter tflite;
+    String modelFile = "converted_model.tflite";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
-        context = this;
+
+        // TensorFlow Lite modelini yükleme
+        try {
+            tflite = new Interpreter(loadModelFile(this, modelFile));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
         // Tahmin butonuna tıklama olayı
         binding.button.setOnClickListener(new View.OnClickListener() {
@@ -58,42 +61,38 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    // Modeli yükleme ve çalıştırma
+    // Modeli yükleme
+    private MappedByteBuffer loadModelFile(Activity activity, String modelFile) throws IOException {
+        AssetFileDescriptor fileDescriptor = activity.getAssets().openFd(modelFile);
+        FileInputStream inputStream = new FileInputStream(fileDescriptor.getFileDescriptor());
+        FileChannel fileChannel = inputStream.getChannel();
+        long startOffset = fileDescriptor.getStartOffset();
+        long declaredLength = fileDescriptor.getDeclaredLength();
+        return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength);
+    }
+
+    // Modeli çalıştırma
     private float[][] runModel(float[][] input) {
-        try {
-            // Modeli yükleme
-            model = ConvertedModel.newInstance(context);
+        // Giriş verisini modelinize uygun hale getirme
+        TensorBuffer inputBuffer = TensorBuffer.createFixedSize(new int[]{input.length, input[0].length}, DataType.FLOAT32);
 
-            // Giriş verisini TensorBuffer'a dönüştürme
-            int inputSize = input.length * input[0].length;
-            float[] flatInput = new float[inputSize];
-            for (int i = 0; i < input.length; i++) {
-                for (int j = 0; j < input[i].length; j++) {
-                    flatInput[i * input[i].length + j] = input[i][j];
-                }
-            }
-            TensorBuffer inputFeature0 = TensorBuffer.createFixedSize(new int[]{1, inputSize}, DataType.FLOAT32);
-            inputFeature0.loadArray(flatInput);
-
-            // Modeli çalıştırma
-            ConvertedModel.Outputs outputs = model.process(inputFeature0);
-            TensorBuffer outputFeature0 = outputs.getOutputFeature0AsTensorBuffer();
-
-            // Çıktıyı işleme ve geri döndürme
-            float[][] output = new float[][]{outputFeature0.getFloatArray()};
-            return output;
-
-        } catch (IOException e) {
-            // Model yükleme hatası durumunda uyarı gösterme
-            e.printStackTrace();
-            Toast.makeText(this, "Model yüklenirken bir hata oluştu", Toast.LENGTH_SHORT).show();
-            return null;
-        }
-        finally {
-            // Modeli kapatma
-            if (model != null) {
-                model.close();
+        // Dönüşümü gerçekleştirme
+        float[] flatInput = new float[input.length * input[0].length];
+        for (int i = 0; i < input.length; i++) {
+            for (int j = 0; j < input[i].length; j++) {
+                flatInput[i * input[i].length + j] = input[i][j];
             }
         }
+
+        // Tek boyutlu diziyi TensorBuffer'a yükleme
+        inputBuffer.loadArray(flatInput);
+
+        // Modeli çalıştırma
+        TensorBuffer outputBuffer = TensorBuffer.createFixedSize(new int[]{input.length, /* çıktı boyutu */}, DataType.FLOAT32);
+        tflite.run(inputBuffer.getBuffer(), outputBuffer.getBuffer());
+
+        // Çıktıyı alarak işleme
+        float[][] output = new float[][]{outputBuffer.getFloatArray()};
+        return output;
     }
 }
